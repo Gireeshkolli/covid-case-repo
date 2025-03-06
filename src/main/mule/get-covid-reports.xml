@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<flow name="get-covid-reportsFlow" doc:id="57e63b49-2b37-497b-a923-5e27a1b64ba0" >
+		<http:listener doc:name="Listener" doc:id="b34af189-f803-40bf-8a3f-e8ca5d7bc058" config-ref="HTTP_Listener_config" path="v1/cases/reports" allowedMethods="GET"/>
+		<ee:transform doc:name="Set correlationId And transactionId" doc:id="93504d02-6e7b-4da7-8d02-1ed94e05cf31">
+		<ee:message/>
+		<ee:variables>
+		<ee:set-variable variableName="correlationId">
+			<![CDATA[ attributes.headers.'x-correlation-id' default "" ]]>
+		</ee:set-variable>
+		<ee:set-variable variableName="transactionId">
+			<![CDATA[ attributes.headers.'x-transaction-id' default uuid() ]]>
+		</ee:set-variable>
+		</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="bf217208-6765-4d35-89b4-add74353d368" message="#[attributes.queryParams.state]"/>
+		<http:request method="GET" doc:name="Request" doc:id="2bae087e-a16c-4f82-96ef-1a7643bc3fa8" url="https://ransom-service.com"/>
+		<ee:transform doc:name="Transform Message" doc:id="991277fa-a7e9-4572-9d70-2a69db18e512" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="reportsDynamicQuery" ><![CDATA[if(!isEmpty(attributes.queryParams.state)) (
+	"select count(*) as count, case_type, state from cvd_case_master where upper(state) = '" ++ upper(attributes.queryParams.state) ++ "' group by case_type, state"
+	
+	) else (
+		"select count(*) as count, case_type, state from cvd_case_master group by case_type, state"  
+)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<db:select doc:name="Select" doc:id="0b11025c-eefd-483c-8a83-3a5fccc3ff9e" config-ref="Database_Config">
+			<db:sql ><![CDATA[#["$(vars.reportsDynamicQuery)"]]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="25b0c5b4-bd0c-4a63-8e6b-2d9df615294a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+fun vaccinatedByState(state) = (payload filter(($.STATE == state as String) and ($.CASE_TYPE == "vaccinated")) 
+	map { COUNT: $.COUNT }
+)[0]
+---
+((payload groupBy($.STATE) mapObject { 
+	caseReports: { 
+		state: $$, 
+		reports: { 
+			total: ($.COUNT reduce $ + $$) - (vaccinatedByState($$).COUNT as Number default 0),
+			 ($ orderBy($.CASE_TYPE) map { 
+			 	($.CASE_TYPE): $.COUNT
+			 })
+		}
+	}
+}).*caseReports) default []]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		
+	</flow>
+</mule>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="global-error-handlerError_Handler" doc:id="393ca300-7e28-490a-9c94-a283f17b5838" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d5b7e6a4-9266-486c-875d-8c902b13c4a2" type="CUSTOM:CONNECTION_FAILED, HTTP:CONNECTIVITY" >
+			<ee:transform doc:name="Set Unavailable Response" doc:id="f15e4fbe-90ec-45e2-9dc8-6876eda46b04" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+   "code":503,
+   "message":"Service Unavailable",
+   "description": "upStream service is not available",
+   "dateTime": now() as String {format: "yyyy-MM-dd"},
+   "transactionId": vars.transactionId
+}
+]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="httpStatus" ><![CDATA[503]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</on-error-propagate>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="63d7a5f5-7f90-4096-a80f-ce54d3e3bc26" type="JSON:SCHEMA_NOT_HONOURED" >
+			<ee:transform doc:name="Set Bad Request Response" doc:id="c5a0d42f-2c70-41d0-9d68-5e5c81d36d53" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+   "code":400,
+   "message":"Bad request",
+   "description": error.errorMessage.payload.message[0] as String,
+   "dateTime": now() as String {format: "yyyy-MM-dd"},
+   "transactionId": vars.transactionId
+}
+]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="httpStatus" ><![CDATA[400]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</on-error-propagate>
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="53177fca-d09f-4020-bb43-e4e5f7d704ca" type="ANY" >
+			<ee:transform doc:name="Set Internal Server Response" doc:id="4352947f-b261-4b8b-be57-59defd330f18" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+   "code":500,
+   "message":"Internal server error",
+   "description":"The server encountered an unexpected condition which prevented it from fulfilling the request",
+   "dateTime": now() as String {format: "yyyy-MM-dd"},
+   "transactionId": vars.transactionId
+}
+]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="httpStatus" ><![CDATA[500]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</on-error-propagate>
+		
+	</error-handler>
+</mule>

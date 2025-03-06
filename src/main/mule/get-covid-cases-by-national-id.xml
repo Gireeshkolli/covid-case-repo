@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<flow name="get-covid-cases-by-national-idFlow" doc:id="9725a565-cee1-46ee-a00e-6044156252b8" >
+		<http:listener doc:name="Listener" doc:id="4e834836-e1d7-450c-b7e0-9490591ff93c" config-ref="HTTP_Listener_config" path="v1/cases/{nationalId}" allowedMethods="GET">
+			<http:error-response statusCode="#[vars.statusCode]" />
+		</http:listener>
+		<ee:transform doc:name="Set CorrelationId And TransactionId" doc:id="229c4373-3484-4330-a39d-fc34fd058a53">
+			<ee:message>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="correlationId" ><![CDATA[attributes.headers.'x-correlation-id' default '']]></ee:set-variable>
+				<ee:set-variable variableName="transactionId" ><![CDATA[attributes.headers.'x-transaction-id' default uuid()]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Start Logger" doc:id="6cc97320-7c83-4f94-8c58-d3d9af41f700" message='transactionId: #[vars.transactionId], correlationId: #[vars.correlationId], message: "get covidcase by national id flow started", payload: #[payload]' />
+		<set-variable value="#[attributes.uriParams.nationalId]" doc:name="Set NationalId" doc:id="ac2cdc6a-e9fa-4446-aab5-76e469c67a22" variableName="nationalID"/>
+		<db:select doc:name="Select Case By NationalId" doc:id="28792d6e-6080-4dbe-913f-b1d9366a2847" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from cvd_case_master where national_id = :nationalID]]></db:sql>
+			<db:input-parameters ><![CDATA[#[nationalID: vars.nationalID]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="12381e18-5e32-4c17-9b83-a051a97358ac" >
+			<when expression="#[sizeOf(payload)&gt;0]">
+				<ee:transform doc:name="Set Success Response" doc:id="ecd468d9-bd85-4636-b0f8-846badfb5890" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<raise-error doc:name="Raise CUSTOM:CASE_NOT_FOUND error" doc:id="4cd88d9e-c64f-4f8e-986b-22ee2fd8cd83" type="CUSTOM:CASE_NOT_FOUND" description="The server has not found anything matching the Request-URI"/>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="End Logger" doc:id="fbeaa4f4-ac68-4936-9d7d-9cd6064d4dc1" message='transactionId: #[vars.transactionId], correlationId: #[vars.correlationId], message: "get covidcase by national id flow ended", payload: #[payload]'/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="77bbb007-8f28-4f6c-8207-1fbb4d35e29d" type="CUSTOM:CASE_NOT_FOUND">
+				<ee:transform doc:name="Set Not Found Response" doc:id="6d9a6090-06b1-4954-9de6-a681bccc8455">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	code: 404,
+	message: "Resource not found",
+	transactionId: vars.transactionId,
+	description: error.description,
+	"dateTime": now() as String {format: "yyyy-MM-dd"}	
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="statusCode" ><![CDATA[404]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	
+</flow>
+</mule>
