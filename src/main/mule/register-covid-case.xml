@@ -89,7 +89,7 @@ output application/json
 		<!-- [STUDIO:"Select CASE_ID"]<db:select doc:name="Select CASE_ID" doc:id="4b61f88c-59e4-4853-b4a8-d3ee8eb470db" config-ref="Database_Config">
 			<db:sql ><![CDATA[select max(case_id) from cvd_case_master&#93;&#93;></db:sql>
 		</db:select> [STUDIO] -->
-		<logger level="INFO" doc:name="End Logger" doc:id="9e7878c1-deb5-4027-b6c5-d68ef7747bad" message="register covid case flow ended"/>
+		<logger level="INFO" doc:name="End Logger " doc:id="9e7878c1-deb5-4027-b6c5-d68ef7747bad" message="register covid case flow ended"/>
 		<error-handler ref="global-error-handlerError_Handler">
 		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d4217fcc-628a-4b39-b41d-3a4a2a6f938c" type="JSON:SCHEMA_NOT_HONOURED" >
 			<ee:transform doc:name="Set Bad Request Response" doc:id="661f477b-e6dc-4704-b87e-cfa43b6fa665" >
